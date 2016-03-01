@@ -31,7 +31,7 @@ local g_dataset = TextSource(g_params.dataset)
 local vocab_size = g_dataset:get_vocab_size()
 local use_lambada = false
 if g_params.dataset.name == 'lambada' or g_params.dataset.name == 'tinywmt12' then
-    use_lambada = true
+    -- use_lambada = true
 end
 
 -- Create clusters if hierarchical softmax is used
@@ -42,10 +42,14 @@ elseif string.find(g_params.model.name, "_smt") then
     use_lambada = false -- smt can't be used to test lambada
 end
 
+if string.find(g_params.model.name, 'scrnn_') then
+    g_params.model.context_scale = 0.05
+    g_params.model.n_layers = 1
+end
+
 local g_dictionary = g_dataset.dict
 -- A data sampler for training and testing
 batch_loader = BatchLoader(g_params.dataset, g_dataset)
--- Meta class to wrap RNN training steps
 
 
 local function eval(split_idx)
@@ -113,18 +117,13 @@ local function evaluate_lambada(cuda)
     local total_acc = 0
     local total_err = 0
     local total_unk = 0
-    -- Copy them to the GPU
-    -- for k, stream in pairs(lambada_streams) do
-    --     if cuda ==  true then
-    --       lambada_streams[k] = stream:type('torch.CudaTensor')
-    --     else
-    --       lambada_streams[k] = stream:type('torch.IntTensor')
-    --     end
-    -- end
+    
+    -- Update hsm in cpu if use hsm
+    meta:update_cpu_hsm()
 
     -- Process each of them
     for k, stream in pairs(lambada_streams) do
-      meta:reset() -- needs to reset the initial state
+      
       xlua.progress(k, n_samples)
           
       total_n = total_n + 1
@@ -138,8 +137,8 @@ local function evaluate_lambada(cuda)
 
 
       local err, acc = meta:lambada(inputs, label)
-      if label[1] = 1 then -- unknown word
-        acc = 0
+      if label[1] == 1 then -- unknown word
+        acc = 0 -- automatically fail for unknown word
         total_unk = total_unk + 1
       end
       total_err = total_err + err
@@ -154,7 +153,7 @@ local function evaluate_lambada(cuda)
     local accuracy = total_acc / total_n
 
     print(string.format('Lambada Validation: Entropy (base 2) : %.5f || ' ..
-                                 'Perplexity : %0.5f || ' .. 'Accuracy : %0.3f with total ' .. ' %i unknown words,
+                                 'Perplexity : %0.5f || ' .. 'Accuracy : %0.3f with total ' .. ' %i unknown words',
                              loss, math.pow(2, loss), accuracy * 100, total_unk))
 
     return loss, accuracy
@@ -181,17 +180,16 @@ local function run(config, model_config, dictionary, lambada, cuda)
     local shrink_type = config.shrink_type
 
     -- Load trained models 
+    meta = MetaRNN(g_params.model, g_dictionary, cuda)
+
     if config.load ~= '' then
 
         save_state = torch.load(config.load)
-        meta = save_state.meta
+        meta.protos = save_state.protos
         learning_rate = save_state.learning_rate
         learning_rate_shrink = save_state.learning_rate_shrink
         print("Model parameters loaded from " .. config.load)
-
-    else
-        -- Create a brand new model
-        meta = MetaRNN(g_params.model, g_dictionary, cuda)
+    
     end
 
      val_err[0] = eval(2) 
@@ -255,7 +253,7 @@ local function run(config, model_config, dictionary, lambada, cuda)
         -- Save models if opted
         if config.save_dir ~= nil then
             local save_state = {}
-            save_state.meta = meta
+            save_state.protos = meta.protos
             save_state.learning_rate = learning_rate
             save_state.learning_rate_shrink = config.learning_rate_shrink
             torch.save(paths.concat(config.save_dir, 'model_' .. epoch), save_state)

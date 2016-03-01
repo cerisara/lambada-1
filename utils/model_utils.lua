@@ -159,4 +159,33 @@ function model_utils.clone_many_times(net, T)
     return clones
 end
 
+
+function model_utils.sparseInit(w, nz, lim)
+    local ni = w:size(1)
+    local no = w:size(2)
+    nz = nz and nz or 15 -- default value set to 15 like in S&M paper.
+    lim = lim and lim or 1 -- default value set to 1
+    w:fill(0.0)
+    for o = 1, no do
+      local perm = torch.randperm(ni)
+      for i = 1, nz do
+          w[perm[i]][o] = math.random() * lim - lim
+      end
+    end
+end
+
+function model_utils.orthInit(w, scl)
+    -- Assume that the weight matrix w is square with equal number of rows R
+    -- (inputs) and the cols C (outputs).
+    -- w is a matrix of size RxC (R=C).
+    -- This function initializes w close to identity, with each of the
+    -- non-diagonal elements randomly sampled from a normal distribution
+    -- with 0 mean and standard deviation lim
+    -- scl is the values on the diagonal. default is 0.9
+    scl = scl and scl or 0.95
+    w:zero()
+    local ni = w:size(1)
+    w:add(torch.eye(ni):typeAs(w) * scl)
+end
+
 return model_utils
