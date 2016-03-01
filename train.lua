@@ -112,7 +112,7 @@ local function evaluate_lambada(cuda)
     local total_n = 0
     local total_acc = 0
     local total_err = 0
-
+    local total_unk = 0
     -- Copy them to the GPU
     -- for k, stream in pairs(lambada_streams) do
     --     if cuda ==  true then
@@ -136,7 +136,12 @@ local function evaluate_lambada(cuda)
         inputs = inputs:cuda()
       end
 
+
       local err, acc = meta:lambada(inputs, label)
+      if label[1] = 1 then -- unknown word
+        acc = 0
+        total_unk = total_unk + 1
+      end
       total_err = total_err + err
       total_acc = total_acc + acc
 
@@ -149,8 +154,8 @@ local function evaluate_lambada(cuda)
     local accuracy = total_acc / total_n
 
     print(string.format('Lambada Validation: Entropy (base 2) : %.5f || ' ..
-                                 'Perplexity : %0.5f || ' .. 'Accuracy : %0.3f',
-                             loss, math.pow(2, loss), accuracy * 100))
+                                 'Perplexity : %0.5f || ' .. 'Accuracy : %0.3f with total ' .. ' %i unknown words,
+                             loss, math.pow(2, loss), accuracy * 100, total_unk))
 
     return loss, accuracy
 
