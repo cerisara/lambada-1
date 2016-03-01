@@ -19,6 +19,7 @@ function HLogSoftMax:__init(mapping, input_size)
     self.n_class_in_cluster = torch.LongTensor(self.n_clusters):zero()
     self.n_max_class_in_cluster = self.mapping[{{},2}]:max()
 
+
     self.reverse_mapping = torch.LongTensor(self.n_clusters, self.n_max_class_in_cluster):zero()
 
     for i = 1, self.mapping:size(1) do
@@ -97,7 +98,6 @@ function HLogSoftMax:generateDistribution(input, target)
     -- Distribution at cluster levels
     local cluster_dist = self.cluster_model:forward(input)
 
-    self.class_dist = {}
     local label = torch.LongTensor(1):zero()
     local word
     local loss = 0
@@ -115,10 +115,14 @@ function HLogSoftMax:generateDistribution(input, target)
             
             -- negative log likelihood from cluster and class
             -- for batch 1 it is much faster than calling the ClassNLLCriterion
-            self.full_probs[word] = - cluster_dist[1][i] - dist[1][j]
+            if word > 0 then -- some values may do not have any reverse mapping
 
-            if c_target == i and cidx_target == j then
-                loss = self.full_probs[word]
+                self.full_probs[word] = - cluster_dist[1][i] - dist[1][j]
+
+                if c_target == i and cidx_target == j then
+                    loss = self.full_probs[word]
+                end
+
             end
         end
     end

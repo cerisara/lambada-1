@@ -176,7 +176,6 @@ function MetaRNN:train(inputs, targets, learning_rate)
         local doutput_t, dsmt_t
         if self.smt == false then
             doutput_t = self.clones.criterion[t]:backward(predictions[t], targets[t]) 
-            print(self.hsm_grad_params:norm())
         else
             dsmt_t = self.clones.criterion[t]:backward(smt_output[t], targets[t])
             doutput_t = self.clones.softmaxtree[t]:backward({predictions[t], targets[t]}, dsmt_t)[1]

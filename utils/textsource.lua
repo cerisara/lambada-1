@@ -88,6 +88,8 @@ function TextSource:__init(config)
     collectgarbage()
 end
 
+-- return a list of tensor streams
+-- a stream is corresponding to one sentence in lambada dataset
 function TextSource:get_lambada_streams()
 
     if self.lambada_tensors == nil then
@@ -124,7 +126,7 @@ function TextSource:create_clusters(config)
     -- Create a Tensor to indicate the clusters with size: vocab_size * 2
     -- Word at index i with have cluster id (clusters[i][1]) and in-cluster id (clusters[i][2])
     self.dict.clusters = torch.LongTensor(vocab_size, 2):zero()
-    local n_in_each_cluster = vocab_size / n_clusters 
+    local n_in_each_cluster = math.ceil(vocab_size / n_clusters) 
     -- Randomly cluster words based on a normal distribution
     local _, idx = torch.sort(torch.randn(vocab_size), 1, true)
 
@@ -146,7 +148,7 @@ function TextSource:create_clusters(config)
             c = n_clusters
         end 
     end
-    print(string.format('using hierarchical softmax with %d classes', n_clusters))
+    print(string.format('using hierarchical softmax with %d classes', c))
 
 
 end

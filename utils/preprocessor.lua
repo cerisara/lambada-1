@@ -17,6 +17,7 @@
 -- based on their frequency to generate buckets with equal probability
 
 require('math')
+local ffivector = require('fb.ffivector')
 local pl = require('pl.import_into')()
 
 local Preprocessor = {}
@@ -152,61 +153,61 @@ function Preprocessor.build_dictionary(config, trainfname, vocabfname)
     end
 
     -- create the cluster index tensors
-    dict.index_to_cluster = torch.LongTensor(net_nwords):fill(0)
-    dict.index_to_index_within_cluster = torch.LongTensor(net_nwords):fill(0)
+    -- dict.index_to_cluster = torch.LongTensor(net_nwords):fill(0)
+    -- dict.index_to_index_within_cluster = torch.LongTensor(net_nwords):fill(0)
 
-    -- sort the tokens by frequency
-    local sorted_freqs, sorted_indx = torch.sort(dict.index_to_freq, true)
-    sorted_freqs:div(math.max(1, tot_nr_words))
-    if nr_clusters == 0 then
-        nr_clusters = math.floor(math.sqrt(net_nwords))
-    end
-    local probab_mass = 1.0 / nr_clusters
-    local current_mass = 0
-    local cluster_id = 1
-    local within_cluster_index = 0
-    for w = 1, net_nwords do
-        if current_mass < probab_mass then
-            current_mass = current_mass + sorted_freqs[w]
-            within_cluster_index = within_cluster_index + 1
-        else
-            cluster_id = cluster_id + 1
-            current_mass = sorted_freqs[w]
-            within_cluster_index = 1
-        end
-        dict.index_to_cluster[sorted_indx[w]] = cluster_id
-        dict.index_to_index_within_cluster[sorted_indx[w]] =
-            within_cluster_index
-    end
-    print("[Created " .. cluster_id .. " clusters.]")
+    -- -- sort the tokens by frequency
+    -- local sorted_freqs, sorted_indx = torch.sort(dict.index_to_freq, true)
+    -- sorted_freqs:div(math.max(1, tot_nr_words))
+    -- if nr_clusters == 0 then
+    --     nr_clusters = math.floor(math.sqrt(net_nwords))
+    -- end
+    -- local probab_mass = 1.0 / nr_clusters
+    -- local current_mass = 0
+    -- local cluster_id = 1
+    -- local within_cluster_index = 0
+    -- for w = 1, net_nwords do
+    --     if current_mass < probab_mass then
+    --         current_mass = current_mass + sorted_freqs[w]
+    --         within_cluster_index = within_cluster_index + 1
+    --     else
+    --         cluster_id = cluster_id + 1
+    --         current_mass = sorted_freqs[w]
+    --         within_cluster_index = 1
+    --     end
+    --     dict.index_to_cluster[sorted_indx[w]] = cluster_id
+    --     dict.index_to_index_within_cluster[sorted_indx[w]] =
+    --         within_cluster_index
+    -- end
+    -- print("[Created " .. cluster_id .. " clusters.]")
 
-    -- Count how many words per cluster there are.
-    local wordsPerCluster = torch.zeros(cluster_id)
-    for w = 1, net_nwords do
-        local curr_cluster = dict.index_to_cluster[w]
-        wordsPerCluster[curr_cluster] = wordsPerCluster[curr_cluster] + 1
-    end
+    -- -- Count how many words per cluster there are.
+    -- local wordsPerCluster = torch.zeros(cluster_id)
+    -- for w = 1, net_nwords do
+    --     local curr_cluster = dict.index_to_cluster[w]
+    --     wordsPerCluster[curr_cluster] = wordsPerCluster[curr_cluster] + 1
+    -- end
 
-    -- build reverse index from cluster id back to index
-    -- also load the explicit mapping to be used by hsm
-    dict.mapping = torch.LongTensor(net_nwords, 2)
-    for c = 1, cluster_id do
-        table.insert(dict.cluster_to_index,
-                     torch.LongTensor(wordsPerCluster[c]))
-    end
-    for w = 1, net_nwords do
-        local curr_cluster = dict.index_to_cluster[w]
-        local curr_word = dict.index_to_index_within_cluster[w]
-        dict.cluster_to_index[curr_cluster][curr_word] = w
-        dict.mapping[w][1] = curr_cluster
-        dict.mapping[w][2] = curr_word
-    end
-    dict.separatorIndex = dict.symbol_to_index['<eos>']
-    dict.nr_clusters = nr_clusters
+    -- -- build reverse index from cluster id back to index
+    -- -- also load the explicit mapping to be used by hsm
+    -- dict.mapping = torch.LongTensor(net_nwords, 2)
+    -- for c = 1, cluster_id do
+    --     table.insert(dict.cluster_to_index,
+    --                  torch.LongTensor(wordsPerCluster[c]))
+    -- end
+    -- for w = 1, net_nwords do
+    --     local curr_cluster = dict.index_to_cluster[w]
+    --     local curr_word = dict.index_to_index_within_cluster[w]
+    --     dict.cluster_to_index[curr_cluster][curr_word] = w
+    --     dict.mapping[w][1] = curr_cluster
+    --     dict.mapping[w][2] = curr_word
+    -- end
+    -- dict.separatorIndex = dict.symbol_to_index['<eos>']
+    -- dict.nr_clusters = nr_clusters
 
     print('There are effectively ' .. net_nwords .. ' words in the corpus.')
 
-    
+    collectgarbage()
     return dict
 end
 
@@ -225,13 +226,13 @@ function Preprocessor.text_to_tensor(dict, filenameIn, config)
    local eos = config.eos or true
    -- first count how many words there are in the corpus
    -- local all_lines = ffivector.new_string()
-   local all_lines = {}
+   -- local all_lines = {}
    local tot_nr_words = 1 -- an <eos> is put at first 
    local tot_lines = 0
    for s in io.lines(filenameIn) do
        -- store the line
        tot_lines = tot_lines + 1
-       all_lines[tot_lines] = s
+       -- all_lines[tot_lines] = s
        -- remove all the tabs in the string
        s = s:gsub("\t", "")
        -- remove leading and following white spaces
@@ -246,24 +247,17 @@ function Preprocessor.text_to_tensor(dict, filenameIn, config)
        tot_nr_words = tot_nr_words + 1 -- eos token 
    end
    print('-- total lines: ' .. tot_lines)
-   -- get the permutation vector
-   -- perm_vec
-   local perm_vec
-   if shuff == true then
-       print('-- shuffling the data')
-       perm_vec = torch.randperm(tot_lines)
-   else
-       print('-- not shuffling the data')
-       perm_vec = torch.range(1, tot_lines)
-   end
+
    -- now store the lines in the tensor
    local data = torch.Tensor(tot_nr_words):zero() -- Allocate memory for the data sequence (very long)
    data[1] = dict.symbol_to_index["<eos>"]
    local id = 0
    local cnt = 2 -- because the first word is eos
-   for ln = 1, tot_lines do
-       xlua.progress(ln, tot_lines)
-       local s = all_lines[perm_vec[ln]]
+   local progress_count = 0
+   -- for ln = 1, tot_lines do
+  for s in io.lines(filenameIn) do
+       progress_count = progress_count + 1
+       xlua.progress(progress_count, tot_lines)
        -- remove all the tabs in the string
        s = s:gsub("\t", "")
        -- remove leading and following white spaces
@@ -294,7 +288,7 @@ function Preprocessor.text_to_tensor(dict, filenameIn, config)
            cnt = cnt + 1
        end
        
-      if ln % 1000 == 0 then
+      if progress_count % 1000 == 0 then
         collectgarbage()
       end
    end
