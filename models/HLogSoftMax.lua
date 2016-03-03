@@ -2,11 +2,12 @@ local HLogSoftMax, parent = torch.class('nn.HLogSoftMax', 'nn.Criterion')
 local HSMClass = require('models.HSMClass')
 
 
-function HLogSoftMax:__init(mapping, input_size)
+function HLogSoftMax:__init(mapping, input_size, sizeAverage)
     -- different implementation of the fbnn.HSM module
     -- variable names are mostly the same as in fbnn.HSM
     -- only supports batch inputs
 
+    self.sizeAverage = sizeAverage or true
     parent.__init(self)
     if type(mapping) == 'table' then
          self.mapping = torch.LongTensor(mapping)
@@ -36,8 +37,8 @@ function HLogSoftMax:__init(mapping, input_size)
     self.cluster_model = nn.Sequential()
     self.cluster_model:add(nn.Linear(input_size, self.n_clusters))
     self.cluster_model:add(nn.LogSoftMax())
-    self.logLossCluster = nn.ClassNLLCriterion()
-
+    self.logLossCluster = nn.ClassNLLCriterion(nil, self.sizeAverage)
+    
     --class softmax/loss
     self.class_model = HSMClass.hsm(self.input_size, self.n_clusters, self.n_max_class_in_cluster)
     local get_layer = function (layer)
@@ -50,7 +51,8 @@ function HLogSoftMax:__init(mapping, input_size)
 		          end    
 		      end
     self.class_model:apply(get_layer)
-    self.logLossClass = nn.ClassNLLCriterion()
+    self.logLossClass = nn.ClassNLLCriterion(nil, self.sizeAverage)
+    -- self.logLossClass.sizeAverage = self.sizeAverage
 
     self:change_bias()
     self.gradInput = torch.Tensor(input_size)
@@ -142,7 +144,7 @@ end
 
 
 function HLogSoftMax:updateOutput(input, target)
-    self.batch_size = input:size(1)
+    local batch_size = input:size(1)
     if torch.type(target) ~= 'torch.CudaTensor' then
         target = target:long()
     end
@@ -158,7 +160,14 @@ function HLogSoftMax:updateOutput(input, target)
                         self.class_model:forward({input, cluster_target}),
                         class_target)
     self.output = cluster_loss + class_loss
-    return self.output                   
+    
+    local n_valid = 1
+
+    if self.sizeAverage == false then
+        n_valid = batch_size
+    end
+
+    return self.output, batch_size                   
 end
 
 function HLogSoftMax:updateGradInput(input, target)

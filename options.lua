@@ -42,9 +42,9 @@ function RNNOption:__init()
                       'dataset.task', 'word',
                       'Task: char language model | word language model',
                       {'char', 'word'})
-    self:option('-shuff',
-                'dataset.shuff', false,
-                'shuffle the sentences in training data or not')
+    self:option('-topn',
+                'trainer.topn', 10,
+                'Compute the accuracy based on topn in the distribution')
     self:option('-nclusters',
                 'dataset.nclusters', 0,
                 'number of clusters for HSM: 0 => sqrt(n)')

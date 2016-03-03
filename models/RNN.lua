@@ -2,7 +2,7 @@ local RNN = {}
 
 -- local ok, cunn = pcall(require, 'fbcunn')
 
-function RNN.rnn(input_size, rnn_size, n, dropout, hsm)
+function RNN.rnn(input_size, rnn_size,  n, dropout, hsm)
   
   -- there are n+1 inputs (hiddens on each layer and x)
   local inputs = {}

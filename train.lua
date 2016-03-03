@@ -30,8 +30,8 @@ end
 local g_dataset = TextSource(g_params.dataset)
 local vocab_size = g_dataset:get_vocab_size()
 local use_lambada = false
-if g_params.dataset.name == 'lambada' or g_params.dataset.name == 'tinywmt12' then
-    -- use_lambada = true
+if g_params.dataset.name == 'lambada' then
+    use_lambada = true
 end
 
 -- Create clusters if hierarchical softmax is used
@@ -178,29 +178,38 @@ local function run(config, model_config, dictionary, lambada, cuda)
     local learning_rate = config.initial_learning_rate
     local learning_rate_shrink =config.learning_rate_shrink
     local shrink_type = config.shrink_type
+    local lambada_loss, lambada_acc, val_loss
+    local load_state
 
     -- Load trained models 
-    meta = MetaRNN(g_params.model, g_dictionary, cuda)
 
     if config.load ~= '' then
 
-        save_state = torch.load(config.load)
-        meta.protos = save_state.protos
-        learning_rate = save_state.learning_rate
-        learning_rate_shrink = save_state.learning_rate_shrink
+        load_state = torch.load(config.load)
+        -- meta.protos = save_state.protos
+        -- learning_rate = save_state.learning_rate
+        learning_rate_shrink = load_state.learning_rate_shrink
         print("Model parameters loaded from " .. config.load)
+        -- print("Learning rate loaded to " .. learning_rate)
     
     end
 
-     val_err[0] = eval(2) 
+    meta = MetaRNN(g_params.model, g_dictionary, cuda, load_state)
 
-    if lambada == true then evaluate_lambada(cuda) end
+
+    val_loss = eval(2) 
+    val_err[0] = val_loss
+
+    if lambada == true then 
+        lambada_loss, lambada_acc = evaluate_lambada(cuda) 
+        val_err[0] = lambada_loss
+    end
 
    
 
     print(string.format('\nValidation: Entropy (base 2) : %.5f || ' ..
                              'Perplexity : %0.5f',
-                         val_err[0], math.pow(2, val_err[0])))
+                        val_loss, math.pow(2, val_loss)))
 
 
     for epoch = 1, config.n_epochs do
@@ -224,15 +233,19 @@ local function run(config, model_config, dictionary, lambada, cuda)
 
         train_err[epoch] = train_loss
 
-        local val_loss = eval(2)
+        val_loss = eval(2)
 
         val_err[epoch] = val_loss
 
-         if lambada == true then evaluate_lambada(cuda) end
+        if lambada == true then 
+            
+            local lambada_loss, lambada_acc = evaluate_lambada(cuda)
+            val_err[epoch] = lambada_loss
+        end
 
         print(string.format('\nValidation: Entropy (base 2) : %.5f || ' ..
                              'Perplexity : %0.5f',
-                         val_err[epoch], math.pow(2, val_err[epoch])))
+                         val_loss, math.pow(2, val_loss)))
 
        
         -- Decrease lr if loss increase

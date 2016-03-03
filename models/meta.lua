@@ -3,11 +3,12 @@ local MetaRNN = torch.class('MetaRNN')
 local model_utils = require 'utils.model_utils'
 local LSTM = require 'models.LSTM'
 local RNN = require 'models.RNN'
+local SCRNN = require 'models.SCRNN'
 require('models.HLogSoftMax')
-
+require('models.LinearNB')
 
 -- A wrapping class than handles RNN computation
-function MetaRNN:__init(config, dict, cuda)
+function MetaRNN:__init(config, dict, cuda, load_state)
 
 	self.batch_loader = batch_loader
 	self.config = config
@@ -31,41 +32,63 @@ function MetaRNN:__init(config, dict, cuda)
         houtput = false
     end
 
-	-- create the rnn steps
-	if string.find(config.name, 'lstm_') then
-    	self.protos.rnn = LSTM.lstm(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
-    elseif string.find(config.name, 'srnn_') then
-    	self.protos.rnn = RNN.rnn(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
-    end
-
     local encoded_size = config.n_hidden -- Size of the last hidden layer (encoded input)
-    if self.hsm == true then 
-        self.protos.criterion = nn.HLogSoftMax(dict.clusters, encoded_size)
-    elseif self.smt == true then
-        self.protos.criterion = nn.TreeNLLCriterion()
-        self.protos.softmaxtree = nn.SoftMaxTree(encoded_size, dict.tree, dict.root_id, false, false)
+
+	-- create the rnn steps
+    if load_state then
+        self.protos = load_state.protos
+
+        self.params, self.grad_params = model_utils.combine_all_parameters(self.protos.rnn)
+        if self.hsm == true then
+            self.hsm_params, self.hsm_grad_params = self.protos.criterion:getParameters()
+        elseif self.smt == true then
+            self.smt_params, self.smt_grad_params = model_utils.combine_all_parameters(self.protos.softmaxtree)
+        end
+
+        self.type = torch.type(self.params)
     else
-    	self.protos.criterion = nn.ClassNLLCriterion()
+
+    	if string.find(config.name, 'lstm_') then
+        	self.protos.rnn = LSTM.lstm(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
+        elseif string.find(config.name, 'srnn_') then
+        	self.protos.rnn = RNN.rnn(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
+        elseif string.find(config.name, 'scrnn') then
+            self.protos.rnn = SCRNN.scrnn(vocab_size, config.n_hidden, config.n_slow, config.context_scale, houtput)
+            encoded_size = config.n_hidden + config.n_slow
+        end
+
+        
+        if self.hsm == true then 
+            self.protos.criterion = nn.HLogSoftMax(dict.clusters, encoded_size)
+            self.cpu_hsm = self.protos.criterion:clone()
+        elseif self.smt == true then
+            self.protos.criterion = nn.TreeNLLCriterion()
+            self.protos.softmaxtree = nn.SoftMaxTree(encoded_size, dict.tree, dict.root_id, false, false)
+        else
+        	self.protos.criterion = nn.ClassNLLCriterion()
+        end
+
+        
+
+        if cuda == true then
+        	self:transfer_gpu()
+        else
+            self.type = 'torch.DoubleTensor'
+        end
+
+
+
+
+        self.params, self.grad_params = model_utils.combine_all_parameters(self.protos.rnn)
+        if self.hsm == true then
+        	self.hsm_params, self.hsm_grad_params = self.protos.criterion:getParameters()
+        elseif self.smt == true then
+            self.smt_params, self.smt_grad_params = model_utils.combine_all_parameters(self.protos.softmaxtree)
+        end
+
+        self:init_params()
+
     end
-
-    
-
-    if cuda == true then
-    	self:transfer_gpu()
-    else
-        self.type = 'torch.DoubleTensor'
-    end
-
-
-
-    self.params, self.grad_params = model_utils.combine_all_parameters(self.protos.rnn)
-    if self.hsm == true then
-    	self.hsm_params, self.hsm_grad_params = self.protos.criterion:getParameters()
-    elseif self.smt == true then
-        self.smt_params, self.smt_grad_params = model_utils.combine_all_parameters(self.protos.softmaxtree)
-    end
-
-    self:init_params()
     self:unroll(self.config.backprop_len)
     self:reset()
 
@@ -75,7 +98,13 @@ end
 function MetaRNN:reset()
 
     self.train_state = self:make_init_state(self.config.batch_size)
+end
 
+function MetaRNN:update_cpu_hsm()
+
+    if self.hsm == true then
+        self.cpu_hsm = self.protos.criterion:clone()
+    end
 end
 
 function MetaRNN:transfer_gpu()
@@ -85,13 +114,14 @@ function MetaRNN:transfer_gpu()
 	for k, v in pairs(self.protos) do v:cuda() end
 end
 
+
+-- Create a start hidden state with batch size
 function MetaRNN:make_init_state(batch_size)
     
     local state = {}
     for L=1, self.config.n_layers do
      
 		 local h_init = torch.zeros(batch_size, self.config.n_hidden):type(self.type)
-		 -- if self.cuda == true then h_init = h_init:cuda() end
 		 table.insert(state, h_init:clone())
 		 if string.find(self.config.name, 'lstm') then
 		     -- since lstm has two memory nodes
@@ -99,9 +129,16 @@ function MetaRNN:make_init_state(batch_size)
 		 end
     end
 
+    -- The context memory for the scrnn
+    if string.find(self.config.name, 'scrnn_') then
+        local c_init = torch.zeros(batch_size, self.config.n_slow):type(self.type)
+        table.insert(state, c_init:clone())
+    end
+
     return state
 
 end
+
 
 function MetaRNN:init_params()
 
@@ -115,7 +152,37 @@ function MetaRNN:init_params()
         self.smt_params:uniform(-self.config.initial_val, self.config.initial_val)
         self.smt_grad_params:zero()
 	end
+
+
+    -- initialize the LSTM forget gates with slightly higher biases to encourage remembering in the beginning
+    if string.find(self.config.name, 'lstm_') then
+        for layer_idx = 1, self.config.n_layers do
+            for _,node in ipairs(self.protos.rnn.forwardnodes) do
+                if node.data.annotations.name == "i2h_" .. layer_idx then
+                    print('setting forget gate biases to 1 in LSTM layer ' .. layer_idx)
+                    -- the gates are, in order, i,f,o,g, so f is the 2nd block of weights
+                    node.data.module.bias[{{self.config.n_hidden+1, 2*self.config.n_hidden}}]:fill(1.0)
+                end
+            end
+        end
+    end
+
+    -- -- Inititialize the SCRNN recurrent context weight
+    -- if string.find(self.config.name, 'scrnn_') then
+        
+    --     for _,node in ipairs(self.protos.rnn.forwardnodes) do
+    --         if node.data.annotations.name == "c2c" then
+    --             local scale = 1 - self.config.context_scale
+    --             node.data.module.weight:zero()
+    --             local ni = node.data.module.weight:size(1)
+    --             node.data.module.weight:add(torch.eye(ni):typeAs(node.data.module.weight) * scale)
+    --         end
+    --     end
+        
+    -- end
 end
+
+
 
 function MetaRNN:unroll(num_steps)
 
@@ -283,7 +350,7 @@ end
 -- Evaluate the lambada loss (ppl and/or accuracy)
 function MetaRNN:lambada(inputs, target, topn)
 
-    topn = topn or 100
+    topn = topn or 10
     local batch_size = inputs:size(2)
     assert(batch_size == 1) -- Batch size must be 1 
 
@@ -316,13 +383,12 @@ function MetaRNN:lambada(inputs, target, topn)
 
     if self.hsm == true then    
         -- Swap back to CPU for faster testing 
-        local criterion = self.protos.criterion:clone()
         if self.type == 'torch.CudaTensor' then
-            criterion:float()
+            self.cpu_hsm:float()
             top_layer = top_layer:float()
         end
 
-        local prob_dist, prob = criterion:generateDistribution(top_layer, target)
+        local prob_dist, prob = self.cpu_hsm:generateDistribution(top_layer, target)
 
         loss = prob
 
