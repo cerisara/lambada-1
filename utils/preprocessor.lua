@@ -17,7 +17,7 @@
 -- based on their frequency to generate buckets with equal probability
 
 require('math')
-local ffivector = require('fb.ffivector')
+-- local ffivector = require('fb.ffivector')
 local pl = require('pl.import_into')()
 
 local Preprocessor = {}
