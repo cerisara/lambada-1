@@ -250,6 +250,8 @@ function RNNOption:parse()
     local mdir = params.model.name
         .. '_bsz=' .. params.trainer.batch_size
         .. '_nhid=' .. params.model.n_hidden
+        .. '_nlayers=' .. params.model.n_layers
+        .. '_dropout=' .. params.model.dropout
         .. '_nslow=' .. params.model.n_slow
         .. '_blen=' .. params.model.backprop_len
         .. '_lr=' .. params.trainer.initial_learning_rate

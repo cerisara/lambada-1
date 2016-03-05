@@ -100,7 +100,7 @@ function HLogSoftMax:generateDistribution(input, target)
     -- Distribution at cluster levels
     local cluster_dist = self.cluster_model:forward(input)
 
-    local label = torch.LongTensor(1):zero()
+    local label = torch.LongTensor(1):zero():type(torch.type(input))
     local word
     local loss = 0
 

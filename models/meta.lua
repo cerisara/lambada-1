@@ -51,7 +51,7 @@ function MetaRNN:__init(config, dict, cuda, load_state)
     	if string.find(config.name, 'lstm_') then
         	self.protos.rnn = LSTM.lstm(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
         elseif string.find(config.name, 'srnn_') then
-        	self.protos.rnn = RNN.rnn(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
+        	self.protos.rnn = RNN.rnn(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput, config.non_linearity)
         elseif string.find(config.name, 'scrnn') then
             self.protos.rnn = SCRNN.scrnn(vocab_size, config.n_hidden, config.n_slow, config.context_scale, houtput)
             encoded_size = config.n_hidden + config.n_slow
@@ -107,6 +107,23 @@ function MetaRNN:update_cpu_hsm()
     end
 end
 
+function MetaRNN:get_total_params()
+
+    local total = 0
+
+    if self.params then
+        total = total + self.params:nElements()
+    end
+
+    if self.hsm_params then
+        total = total + self.hsm_params:nElements()
+    end
+
+    if self.smt_params then
+        total = total + self.smt_params:nElements()
+    end
+end
+
 function MetaRNN:transfer_gpu()
 
 	self.cuda = true
@@ -140,6 +157,8 @@ function MetaRNN:make_init_state(batch_size)
 end
 
 
+
+
 function MetaRNN:init_params()
 
 	self.grad_params:zero()
@@ -167,7 +186,27 @@ function MetaRNN:init_params()
         end
     end
 
-    -- -- Inititialize the SCRNN recurrent context weight
+    if string.find(self.config.name, 'srnn_') then
+
+        if self.config.w_init == 'eye' then
+            for layer_idx = 1, self.config.n_layers do
+                for _,node in ipairs(self.protos.rnn.forwardnodes) do
+                    if node.data.annotations.name == "h2h_" .. layer_idx then
+                        print('setting hidden transform in RNN layer ' .. layer_idx .. ' as an identity matrix')
+                        -- the gates are, in order, i,f,o,g, so f is the 2nd block of weights
+                        -- node.data.module.bias[{{self.config.n_hidden+1, 2*self.config.n_hidden}}]:fill(1.0)
+                        node.data.module.weight:zero()
+                        local ni = node.data.module.weight:size(1)
+                        node.data.module.weight:add(torch.eye(ni):typeAs(node.data.module.weight) * 1)
+                        -- print(node.data.module.weight)
+                    end
+                end
+            end
+
+        end
+    end
+
+    --  -- Inititialize the SCRNN recurrent context weight
     -- if string.find(self.config.name, 'scrnn_') then
         
     --     for _,node in ipairs(self.protos.rnn.forwardnodes) do
@@ -176,6 +215,7 @@ function MetaRNN:init_params()
     --             node.data.module.weight:zero()
     --             local ni = node.data.module.weight:size(1)
     --             node.data.module.weight:add(torch.eye(ni):typeAs(node.data.module.weight) * scale)
+    --             print(node.data.module.weight)
     --         end
     --     end
         
@@ -232,7 +272,7 @@ function MetaRNN:train(inputs, targets, learning_rate)
     end
 
     self.train_state = clone_list(rnn_states[truncate])
-   
+
     
     -- BACKWARD PASS
     local drnn_states = {[truncate] = self:make_init_state(batch_size)} 
@@ -388,6 +428,7 @@ function MetaRNN:lambada(inputs, target, topn)
             top_layer = top_layer:float()
         end
 
+        -- 
         local prob_dist, prob = self.cpu_hsm:generateDistribution(top_layer, target)
 
         loss = prob

@@ -2,8 +2,9 @@ local RNN = {}
 
 -- local ok, cunn = pcall(require, 'fbcunn')
 
-function RNN.rnn(input_size, rnn_size,  n, dropout, hsm)
+function RNN.rnn(input_size, rnn_size,  n, dropout, hsm, nonlinear)
   
+  nonlinear = nonlinear or "sigmoid"
   -- there are n+1 inputs (hiddens on each layer and x)
   local inputs = {}
   table.insert(inputs, nn.Identity()()) -- x
@@ -12,6 +13,16 @@ function RNN.rnn(input_size, rnn_size,  n, dropout, hsm)
 
   end
   local embedding_layer = nn.LookupTable(input_size, rnn_size)
+
+  local nonlinear_function
+
+  if nonlinear == "sigmoid" then
+    nonlinear_function = nn.Sigmoid()
+  elseif nonlinear == "tanh" then
+    nonlinear_function = nn.Tanh()
+  else
+    nonlinear_function = nn.ReLU()
+  end
 
   local x, input_size_L
   local outputs = {}
@@ -30,9 +41,10 @@ function RNN.rnn(input_size, rnn_size,  n, dropout, hsm)
 
     -- RNN tick
     local i2h = nn.Linear(input_size_L, rnn_size)(x)
-    local h2h = nn.Linear(rnn_size, rnn_size)(prev_h)
-    local next_h = nn.Sigmoid()(nn.CAddTable(){i2h, h2h})
+    local h2h = nn.Linear(rnn_size, rnn_size)(prev_h):annotate{name="h2h_" .. L}
+    local next_h = nonlinear_function(nn.CAddTable(){i2h, h2h})
     -- local next_h = nn.Tanh()(nn.CAddTable(){i2h, h2h})
+
 
     table.insert(outputs, next_h)
   end

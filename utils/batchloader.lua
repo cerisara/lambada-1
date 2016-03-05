@@ -27,15 +27,15 @@ function BatchLoader:__init(config, text_source)
 		local stream = streams[i]
 		-- Convert the stream to inputs and labels
 		local inputs = stream[{{1, stream:size(1)-1}}]
-    	local labels = stream[{{2, stream:size(1)}}]
+		local labels = stream[{{2, stream:size(1)}}]
 
-    	-- Store in the table
-    	self.all_batches[i] = {inputs, labels}
-    	local nbatches = math.ceil(inputs:size(1) / self.seq_length) -- dim 1 is the number of elements, dim 2 is batch size
-    	self.split_sizes[i] = nbatches -- number of batches
-    	if i > 1 then
-    		self.split_sizes[i] = 1 -- one batch for valid and test (we don't need to backward in testing)
-    	end
+		-- Store in the table
+		self.all_batches[i] = {inputs, labels}
+		local nbatches = math.ceil(inputs:size(1) / self.seq_length) -- dim 1 is the number of elements, dim 2 is batch size
+		self.split_sizes[i] = nbatches -- number of batches
+		if i > 1 then
+			self.split_sizes[i] = 1 -- one batch for valid and test (we don't need to backward in testing)
+		end
 	end
 
 	self.batch_idx = {0, 0, 0}

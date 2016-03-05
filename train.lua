@@ -100,6 +100,11 @@ local function train_epoch(learning_rate)
         if i % 50 == 0 then
             collectgarbage()
         end
+
+        if sys.isNaN(loss) then
+            print('Warning ... Not a Number detected')
+            os.exit(0) 
+        end
     end
 
     local train_loss = total_loss / total_length / math.log(2)
@@ -120,6 +125,7 @@ local function evaluate_lambada(cuda)
     
     -- Update hsm in cpu if use hsm
     meta:update_cpu_hsm()
+    meta.cpu_hsm:change_bias()
 
     -- Process each of them
     for k, stream in pairs(lambada_streams) do
