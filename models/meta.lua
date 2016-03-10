@@ -391,6 +391,7 @@ end
 function MetaRNN:lambada(inputs, target, topn)
 
     topn = topn or 10
+
     local batch_size = inputs:size(2)
     assert(batch_size == 1) -- Batch size must be 1 
 
@@ -433,6 +434,8 @@ function MetaRNN:lambada(inputs, target, topn)
 
         loss = prob
 
+        -- false : sort in ascending order
+        -- we need to find min -log(P) ~ max log(P)
         sorted_value, sorted_indx = torch.sort(prob_dist, false)
 
         for i = 1, topn do
@@ -444,10 +447,17 @@ function MetaRNN:lambada(inputs, target, topn)
         end
 
     else -- Normal softmax (much faster than HSM)
+        -- print(top_layer)
+        -- print(self.protos.criterion:type())
+        -- print(target)
+        target = target:cuda()
         loss  = self.protos.criterion:forward(top_layer, target)
         -- The distribution of all words in vocab
         local prob_dist = top_layer
-        sorted_value, sorted_indx = torch.sort(prob_dist, 2, false)
+
+        -- sort in descending order
+        -- because the values are logP (negative)
+        sorted_value, sorted_indx = torch.sort(prob_dist, 2, true)
 
         for i = 1, topn do
             if target[1] == sorted_indx[1][i] then

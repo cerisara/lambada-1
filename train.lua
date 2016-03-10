@@ -80,6 +80,7 @@ local function train_epoch(learning_rate)
     local total_loss = 0
     local total_words = 0
     meta:reset() -- reset the initial state (to zeros)
+    batch_loader:reset_batch_pointer()
 
     for i = 1, ntrain do
         xlua.progress(i, ntrain)
@@ -114,7 +115,7 @@ local function train_epoch(learning_rate)
 end
 
 
-local function evaluate_lambada(cuda)
+local function evaluate_lambada(cuda, topn)
 
     local lambada_streams = batch_loader:get_lambada_streams()
     local n_samples = #lambada_streams
@@ -125,7 +126,10 @@ local function evaluate_lambada(cuda)
     
     -- Update hsm in cpu if use hsm
     meta:update_cpu_hsm()
-    meta.cpu_hsm:change_bias()
+    
+    if meta.cpu_hsm then
+        meta.cpu_hsm:change_bias()
+    end
 
     -- Process each of them
     for k, stream in pairs(lambada_streams) do
@@ -142,7 +146,7 @@ local function evaluate_lambada(cuda)
       end
 
 
-      local err, acc = meta:lambada(inputs, label)
+      local err, acc = meta:lambada(inputs, label, topn)
       if label[1] == 1 then -- unknown word
         acc = 0 -- automatically fail for unknown word
         total_unk = total_unk + 1
@@ -207,7 +211,7 @@ local function run(config, model_config, dictionary, lambada, cuda)
     val_err[0] = val_loss
 
     if lambada == true then 
-        lambada_loss, lambada_acc = evaluate_lambada(cuda) 
+        lambada_loss, lambada_acc = evaluate_lambada(cuda, config.topn) 
         val_err[0] = lambada_loss
     end
 
@@ -245,7 +249,7 @@ local function run(config, model_config, dictionary, lambada, cuda)
 
         if lambada == true then 
             
-            local lambada_loss, lambada_acc = evaluate_lambada(cuda)
+            local lambada_loss, lambada_acc = evaluate_lambada(cuda, config.topn)
             val_err[epoch] = lambada_loss
         end
 
@@ -293,7 +297,7 @@ local function run(config, model_config, dictionary, lambada, cuda)
 
 
 end
-
+-- print(g_dictionary)
 cmd:print_params(g_params)
 
 run(g_params.trainer, g_params.model, g_dictionary, use_lambada, cuda)

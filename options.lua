@@ -43,7 +43,7 @@ function RNNOption:__init()
                       'Task: char language model | word language model',
                       {'char', 'word'})
     self:option('-topn',
-                'trainer.topn', 10,
+                'trainer.topn', 1,
                 'Compute the accuracy based on topn in the distribution')
     self:option('-nclusters',
                 'dataset.nclusters', 0,

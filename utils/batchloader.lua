@@ -51,9 +51,9 @@ function BatchLoader:get_vocab_size()
 	return self.vocab_size
 end
 
-function BatchLoader:reset_batch_pointer(split_idx, batch_idx)
+function BatchLoader:reset_batch_pointer(batch_idx)
     batch_idx = batch_idx or 0
-    self.batch_idx[split_idx] = batch_idx
+    self.batch_idx[1] = batch_idx
 end
 
 function BatchLoader:next_batch(split_idx)

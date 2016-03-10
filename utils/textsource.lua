@@ -42,7 +42,7 @@ function TextSource:__init(config)
     self.valid_txt = paths.concat(self.root, "valid.txt")
     self.test_txt = paths.concat(self.root, "test.txt")
     self.vocab_file = paths.concat(self.root, "vocab.txt")
-    self.accuracy_valid_txt = paths.concat(self.root, "accuracy_valid.txt")
+    self.accuracy_valid_txt = paths.concat(self.root, "lambada.txt")
     self.files = {self.train_txt, self.valid_txt, self.test_txt}
     local output_tensors = {}
 

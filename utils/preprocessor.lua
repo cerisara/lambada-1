@@ -303,7 +303,6 @@ function Preprocessor.text_to_lambada_tensor(dict, filenameIn, config)
    print("Processing file " .. filenameIn)
    local unk = "<unk>"
    local threshold = config.threshold
-   local eos = config.eos or true
 
    local tensor_data = {}
    

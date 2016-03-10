@@ -30,7 +30,6 @@ function RNN.rnn(input_size, rnn_size,  n, dropout, hsm, nonlinear)
     
     local prev_h = inputs[L+1]
     if L == 1 then 
-      -- x = OneHot(input_size)(inputs[1])
       x = embedding_layer(inputs[1])
       input_size_L = rnn_size
     else 
@@ -43,7 +42,6 @@ function RNN.rnn(input_size, rnn_size,  n, dropout, hsm, nonlinear)
     local i2h = nn.Linear(input_size_L, rnn_size)(x)
     local h2h = nn.Linear(rnn_size, rnn_size)(prev_h):annotate{name="h2h_" .. L}
     local next_h = nonlinear_function(nn.CAddTable(){i2h, h2h})
-    -- local next_h = nn.Tanh()(nn.CAddTable(){i2h, h2h})
 
 
     table.insert(outputs, next_h)
