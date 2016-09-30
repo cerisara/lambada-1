@@ -48,8 +48,10 @@ function MetaRNN:__init(config, dict, cuda, load_state)
         self.type = torch.type(self.params)
     else
 
-    	if string.find(config.name, 'lstm_') then
+    	if string.find(config.name, 'lstm') then
+          print("running lstm")
         	self.protos.rnn = LSTM.lstm(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
+          print(self.protos.rnn)
         elseif string.find(config.name, 'srnn_') then
         	self.protos.rnn = RNN.rnn(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput, config.non_linearity)
         elseif string.find(config.name, 'scrnn') then

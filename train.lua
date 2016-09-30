@@ -145,7 +145,7 @@ local function evaluate_lambada(cuda, topn)
         inputs = inputs:cuda()
       end
 
-
+			print(label)
       local err, acc = meta:lambada(inputs, label, topn)
       if label[1] == 1 then -- unknown word
         acc = 0 -- automatically fail for unknown word

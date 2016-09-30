@@ -93,6 +93,7 @@ end
 function TextSource:get_lambada_streams()
 
     if self.lambada_tensors == nil then
+--        print("lambada tensor is nil")
         return nil
     end
     
