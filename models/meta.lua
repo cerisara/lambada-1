@@ -6,6 +6,7 @@ local RNN = require 'models.RNN'
 local SCRNN = require 'models.SCRNN'
 require('models.HLogSoftMax')
 require('models.LinearNB')
+require('cunn')
 
 -- A wrapping class than handles RNN computation
 function MetaRNN:__init(config, dict, cuda, load_state)
@@ -49,9 +50,7 @@ function MetaRNN:__init(config, dict, cuda, load_state)
     else
 
     	if string.find(config.name, 'lstm') then
-          print("running lstm")
         	self.protos.rnn = LSTM.lstm(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput)
-          print(self.protos.rnn)
         elseif string.find(config.name, 'srnn_') then
         	self.protos.rnn = RNN.rnn(vocab_size, config.n_hidden, config.n_layers, config.dropout, houtput, config.non_linearity)
         elseif string.find(config.name, 'scrnn') then
@@ -452,7 +451,7 @@ function MetaRNN:lambada(inputs, target, topn)
         -- print(top_layer)
         -- print(self.protos.criterion:type())
         -- print(target)
-        target = target:cuda()
+        -- target = target:cuda()
         loss  = self.protos.criterion:forward(top_layer, target)
         -- The distribution of all words in vocab
         local prob_dist = top_layer
