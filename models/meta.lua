@@ -491,6 +491,13 @@ function MetaRNN:lambada_test(inputs, target, topn, stopwords)
   local length = inputs:size(1)
   local top_layer
 
+--	print(#inputs)
+
+	local inputs_kv = {}
+	for t = 1, inputs:size(1) do
+		inputs_kv[inputs[t][1]] = true
+	end
+
   for t = 1, length do 
 
     local lst = self.protos.rnn:forward{inputs[t], unpack(rnn_state)}
@@ -525,11 +532,6 @@ function MetaRNN:lambada_test(inputs, target, topn, stopwords)
     -- we need to find min -log(P) ~ max log(P)
     sorted_value, sorted_indx = torch.sort(prob_dist, false)
 
-    for i=#sorted_indx,1,-1 do
-      if stopwords[sorted_indx[i]] then
-        table.remove(sorted_indx, i)
-      end
-    end
 
     for i = 1, topn do
       -- print(target[1], sorted_indx[i], prob_dist[sorted_indx[i]])
@@ -552,16 +554,30 @@ function MetaRNN:lambada_test(inputs, target, topn, stopwords)
     -- because the values are logP (negative)
     sorted_value, sorted_indx = torch.sort(prob_dist, 2, true)
 
-    for i = #sorted_indx, 1, -1 do
-      if stopwords[sorted_indx[i]] then
-        table.remove(sorted_indx[1], i)
+--    print(inputs)
+ 		
+
+    local sorted = {}
+		for j=1,sorted_indx:size(2) do
+	    sorted[j] = sorted_indx[1][j]
+	  end
+
+
+--		print(sorted)
+--		print(inputs_kv)
+
+    for i = #sorted, 1, -1 do
+      if stopwords[sorted[i]] or not inputs_kv[sorted[i]] then
+--        print(sorted[i])
+				table.remove(sorted, i)
       end
     end
---    print(sorted_indx)
+--    print(sorted)
+--		print(target[1])
  
     for i = 1, topn do
-      if target[1] == sorted_indx[1][i] then
-        print("correct!")
+      if target[1] == sorted[i] then
+--       print("correct!")
         acc = 1
         break
       end
