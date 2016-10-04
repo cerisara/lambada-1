@@ -88,3 +88,7 @@ function BatchLoader:get_lambada_streams()
 
 	return self.text_source:get_lambada_streams()
 end
+
+function BatchLoader:get_stopwords()
+  return self.text_source:get_stopwords()
+end

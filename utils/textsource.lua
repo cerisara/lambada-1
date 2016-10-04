@@ -21,6 +21,7 @@ require 'xlua'
 
 local TextSource = torch.class('TextSource')
 local preprocessor = require 'utils.preprocessor'
+local io = require 'io'
 
 -- config:
 -- {
@@ -85,7 +86,20 @@ function TextSource:__init(config)
 
     end
 
+    local data = {}
+    for s in io.lines(self.stopwords_file) do
+      s = s:gsub("^%s+", ""):gsub("%s+$", "")
+      if self.dict.symbol_to_index[s] ~= nil then
+        data[#data + 1] = self.dict.symbol_to_index[s]
+      end
+    end
+    self.sets['stopwords'] = data
+
     collectgarbage()
+end
+
+function TextSource:get_stopwords()
+  return self.sets['stopwords']
 end
 
 -- return a list of tensor streams
