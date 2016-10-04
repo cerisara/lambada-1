@@ -44,6 +44,7 @@ function TextSource:__init(config)
     self.test_txt = paths.concat(self.root, "test.txt")
     self.vocab_file = paths.concat(self.root, "vocab.txt")
     self.accuracy_valid_txt = paths.concat(self.root, "lambada.txt")
+    self.stopwords_file = paths.concat(self.root, "stopwords.txt")
     self.files = {self.train_txt, self.valid_txt, self.test_txt}
     local output_tensors = {}
 
@@ -90,7 +91,7 @@ function TextSource:__init(config)
     for s in io.lines(self.stopwords_file) do
       s = s:gsub("^%s+", ""):gsub("%s+$", "")
       if self.dict.symbol_to_index[s] ~= nil then
-        data[#data + 1] = self.dict.symbol_to_index[s]
+        data[self.dict.symbol_to_index[s]] = true
       end
     end
     self.sets['stopwords'] = data

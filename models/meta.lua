@@ -473,3 +473,103 @@ function MetaRNN:lambada(inputs, target, topn)
 
 
 end
+
+-- Evaluate the lambada loss (ppl and/or accuracy)
+function MetaRNN:lambada_test(inputs, target, topn, stopwords)
+
+  topn = topn or 10
+
+  local batch_size = inputs:size(2)
+  assert(batch_size == 1) -- Batch size must be 1 
+
+  if self.hsm == true then
+    self.protos.criterion:change_bias()
+  end
+
+  local rnn_state = self:make_init_state(batch_size)
+  local n_layers = #rnn_state
+  local length = inputs:size(1)
+  local top_layer
+
+  for t = 1, length do 
+
+    local lst = self.protos.rnn:forward{inputs[t], unpack(rnn_state)}
+    rnn_state = {}
+    for i =1, n_layers do table.insert(rnn_state, lst[i]) end
+
+    if t == length then
+      top_layer = lst[#lst] 
+    end
+  end
+
+  -- Compute perplexity ( log P(y|x))
+  local loss
+
+  -- Compute accuracy (argmax P(y|x) with topn)
+  local acc = 0
+  local sorted_value, sorted_indx
+
+  if self.hsm == true then    
+    -- Swap back to CPU for faster testing 
+    if self.type == 'torch.CudaTensor' then
+      self.cpu_hsm:float()
+      top_layer = top_layer:float()
+    end
+
+    -- 
+    local prob_dist, prob = self.cpu_hsm:generateDistribution(top_layer, target)
+
+    loss = prob
+
+    -- false : sort in ascending order
+    -- we need to find min -log(P) ~ max log(P)
+    sorted_value, sorted_indx = torch.sort(prob_dist, false)
+
+    for i=#sorted_indx,1,-1 do
+      if stopwords[sorted_indx[i]] then
+        table.remove(sorted_indx, i)
+      end
+    end
+
+    for i = 1, topn do
+      -- print(target[1], sorted_indx[i], prob_dist[sorted_indx[i]])
+      if target[1] == sorted_indx[i] then
+        acc = 1
+        break
+      end
+    end
+
+  else -- Normal softmax (much faster than HSM)
+    -- print(top_layer)
+    -- print(self.protos.criterion:type())
+    -- print(target)
+    -- target = target:cuda()
+    loss  = self.protos.criterion:forward(top_layer, target)
+    -- The distribution of all words in vocab
+    local prob_dist = top_layer
+
+    -- sort in descending order
+    -- because the values are logP (negative)
+    sorted_value, sorted_indx = torch.sort(prob_dist, 2, true)
+
+    for i = #sorted_indx, 1, -1 do
+      if stopwords[sorted_indx[i]] then
+        table.remove(sorted_indx[1], i)
+      end
+    end
+--    print(sorted_indx)
+ 
+    for i = 1, topn do
+      if target[1] == sorted_indx[1][i] then
+        print("correct!")
+        acc = 1
+        break
+      end
+    end
+
+  end
+
+  return loss, acc 
+
+
+end

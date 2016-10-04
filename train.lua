@@ -146,7 +146,8 @@ local function evaluate_lambada(cuda, topn)
       end
 
       stopwords = batch_loader:get_stopwords()
-      local err, acc = meta:lambada(inputs, label, topn, stopwods)
+      --print(stopwords)
+      local err, acc = meta:lambada_test(inputs, label, topn, stopwods)
       if label[1] == 1 then -- unknown word
         acc = 0 -- automatically fail for unknown word
         total_unk = total_unk + 1
