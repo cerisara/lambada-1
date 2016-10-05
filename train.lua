@@ -209,12 +209,11 @@ local function run(config, model_config, dictionary, lambada, cuda)
 
 
 
+    val_loss = eval(2) 
+    val_err[0] = val_loss
     if lambada == true then 
         lambada_loss, lambada_acc = evaluate_lambada(cuda, config.topn) 
         val_err[0] = lambada_loss
-    else
-    		val_loss = eval(2) 
-    		val_err[0] = val_loss
 		end
 
    
@@ -246,13 +245,12 @@ local function run(config, model_config, dictionary, lambada, cuda)
         train_err[epoch] = train_loss
 
 
+        val_loss = eval(2)
+		    val_err[epoch] = val_loss
         if lambada == true then 
             
             local lambada_loss, lambada_acc = evaluate_lambada(cuda, config.topn)
             val_err[epoch] = lambada_loss
-				else
-        		val_loss = eval(2)
-		        val_err[epoch] = val_loss
         end
 
         print(string.format('\nValidation: Entropy (base 2) : %.5f || ' ..
