@@ -389,7 +389,7 @@ end
 
 
 -- Evaluate the lambada loss (ppl and/or accuracy)
-function MetaRNN:lambada(inputs, target, topn)
+function MetaRNN:lambada(inputs, target, topn, cuda)
 
     topn = topn or 10
 
@@ -451,7 +451,9 @@ function MetaRNN:lambada(inputs, target, topn)
         -- print(top_layer)
         -- print(self.protos.criterion:type())
         -- print(target)
-        -- target = target:cuda()
+				if cuda then
+        		target = target:cuda()
+				end
         loss  = self.protos.criterion:forward(top_layer, target)
         -- The distribution of all words in vocab
         local prob_dist = top_layer
@@ -475,7 +477,7 @@ function MetaRNN:lambada(inputs, target, topn)
 end
 
 -- Evaluate the lambada loss (ppl and/or accuracy)
-function MetaRNN:lambada_test(inputs, target, topn, stopwords)
+function MetaRNN:lambada_test(inputs, target, topn, stopwords, cuda)
 
   topn = topn or 10
 
@@ -545,7 +547,9 @@ function MetaRNN:lambada_test(inputs, target, topn, stopwords)
     -- print(top_layer)
     -- print(self.protos.criterion:type())
     -- print(target)
-    -- target = target:cuda()
+    if cuda then
+			target = target:cuda()
+		end
     loss  = self.protos.criterion:forward(top_layer, target)
     -- The distribution of all words in vocab
     local prob_dist = top_layer

@@ -87,6 +87,8 @@ function TextSource:__init(config)
 
     end
 
+
+    --read stopwords
     local data = {}
     for s in io.lines(self.stopwords_file) do
       s = s:gsub("^%s+", ""):gsub("%s+$", "")
