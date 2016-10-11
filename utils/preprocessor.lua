@@ -23,7 +23,7 @@ local pl = require('pl.import_into')()
 local Preprocessor = {}
 
 function Preprocessor.build_dictionary(config, trainfname, vocabfname)
-    local kMaxDictSize = 500000
+    local kMaxDictSize = 50000
     local dict = {}
     dict.symbol_to_index = {}   -- string -> id
     dict.index_to_symbol = {}   -- id -> string

@@ -268,8 +268,9 @@ function MetaRNN:train(inputs, targets, learning_rate)
         else
             err = self.clones.criterion[t]:forward(predictions[t], targets[t]) 
         end
-
-        loss = loss + err
+				if t == truncate then
+	        loss = loss + err
+				end
     end
 
     self.train_state = clone_list(rnn_states[truncate])
